@@ -1,0 +1,7 @@
+Plaintext
+streamlit
+dnspython
+groq
+python-dotenv
+pandas
+reportlab
