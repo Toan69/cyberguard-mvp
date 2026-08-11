@@ -18,9 +18,42 @@ from dotenv import load_dotenv
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from supabase import create_client, Client
 
 # Ladda API-nyckel från .env
 load_dotenv()
+
+# --- SUPABASE-INTEGRATION ---
+@st.cache_resource
+def init_supabase():
+    url = st.secrets.get("SUPABASE_URL") or os.getenv("SUPABASE_URL")
+    key = st.secrets.get("SUPABASE_KEY") or os.getenv("SUPABASE_KEY")
+    if url and key:
+        try:
+            return create_client(url, key)
+        except Exception:
+            return None
+    return None
+
+supabase: Client = init_supabase()
+
+def save_subscription_to_supabase(email: str, domain: str, score: int = 0):
+    """Sparar en prenumeration/lead i Supabase-databasen."""
+    if not supabase:
+        return False
+    try:
+        data = {
+            "email": email,
+            "domain": domain,
+            "status": "active",
+            "last_score": score,
+            "plan": "basic"
+        }
+        supabase.table("subscriptions").insert(data).execute()
+        return True
+    except Exception as e:
+        st.error(f"Supabase-fel: {e}")
+        return False
 
 # --- SIDKONFIGURATION ---
 st.set_page_config(
@@ -201,12 +234,7 @@ def render_score_gauge(score):
 
 # --- E-POSTVALIDERING ---
 def is_valid_email(email_addr):
-    """
-    Kontrollerar både format (regex) och att domänen faktiskt
-    har en mailserver (MX-post). Fångar t.ex. 'asdf@asdf' eller
-    'namn@paahittad-domän.se'.
-    """
-    pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+    pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z2,}$"
     if not re.match(pattern, email_addr.strip()):
         return False, "E-postadressen har fel format. Ange t.ex. namn@företag.se"
 
@@ -313,11 +341,9 @@ def send_email_report(to_email, domain_name, score, scan_results, ai_summary):
         msg['To'] = to_email
         msg['Subject'] = f"Säkerhetsrapport för {domain_name} — CyberGuard AI"
 
-        # Textversion (fallback för klienter som inte visar HTML)
         plain_body = f"Hej!\n\nTack för att du körde en säkerhetsanalys på CyberGuard AI.\n\nSäkerhetspoäng för {domain_name}: {score}/100\n\nAI-analys:\n{ai_summary}\n\nMed vänliga hälsningar,\nCyberGuard AI"
         msg.attach(MIMEText(plain_body, 'plain'))
 
-        # HTML-version
         html_body = build_html_email(domain_name, score, scan_results, ai_summary)
         msg.attach(MIMEText(html_body, 'html'))
 
@@ -391,9 +417,6 @@ def create_pdf(domain_name, score, scan_results, missing_items, ai_text):
 # --- SIDOMENY (ADMIN) ---
 st.sidebar.title("🔐 Adminpanel")
 admin_password = st.sidebar.text_input("Lösenord:", type="password")
-
-# OBS: Lägg till ADMIN_PASSWORD i Streamlit Cloud → Settings → Secrets.
-# Tills du gjort det används "admin123" som reserv (byt ASAP, se not nedan).
 correct_admin_password = st.secrets.get("ADMIN_PASSWORD", "admin123")
 
 if admin_password and admin_password == correct_admin_password:
@@ -404,7 +427,24 @@ if admin_password and admin_password == correct_admin_password:
     st.write(f"**Groq API-nyckel:** {api_key_status}")
 
     st.divider()
-    st.subheader("📊 Insamlade Leads")
+    
+    # VISA SUPABASE PRENUMERANTER
+    st.subheader("⚡ Övervakade Kunder (Supabase)")
+    if supabase:
+        try:
+            res = supabase.table("subscriptions").select("*").execute()
+            if res.data:
+                df_sub = pd.DataFrame(res.data)
+                st.dataframe(df_sub, use_container_width=True)
+            else:
+                st.info("Inga prenumerationer i Supabase ännu.")
+        except Exception as e:
+            st.error(f"Kunde inte hämta från Supabase: {e}")
+    else:
+        st.warning("Supabase är inte anslutet. Kontrollera Secrets.")
+
+    st.divider()
+    st.subheader("📊 Insamlade Leads (CSV)")
     
     if os.path.exists('leads.csv'):
         df = pd.read_csv('leads.csv')
@@ -418,7 +458,7 @@ if admin_password and admin_password == correct_admin_password:
                 mime="text/csv"
             )
     else:
-        st.info("Inga leads har sparats ännu.")
+        st.info("Inga CSV-leads har sparats ännu.")
     
     st.stop()
 
@@ -554,10 +594,8 @@ if 'scan_results' in st.session_state:
     st.write("---")
     st.markdown(f"### 📊 Analysresultat för `{clean_domain}`")
 
-    # Poäng-gauge (visuell mätare istället för text-banner)
     render_score_gauge(final_score)
 
-    # Detaljerad status per kontroll (status-badges istället för punktlista)
     st.markdown("#### Detektionsöversikt")
 
     for test, status in scan_results.items():
@@ -574,7 +612,6 @@ if 'scan_results' in st.session_state:
     st.markdown("#### 🧠 AI-Analys & Rådgivning")
     st.markdown(f'<div class="cg-card">{ai_text}</div>', unsafe_allow_html=True)
 
-    # Ladda ner PDF
     pdf_buffer = create_pdf(clean_domain, final_score, scan_results, missing_items, ai_text)
     st.download_button(
         label="📄 Ladda ner fullständig PDF-Rapport",
@@ -584,31 +621,35 @@ if 'scan_results' in st.session_state:
         use_container_width=True
     )
 
-    # Lead capture
-    if final_score < 100:
-        st.write("---")
-        st.subheader("📬 Behöver du hjälp att åtgärda bristerna?")
-        st.write("Fyll i din e-postadress så skickar vi en kostnadsfri åtgärdsplan och förslag på hur vi kan hjälpa dig konfigurera skydden.")
-        
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            email = st.text_input("Din e-postadress:", label_visibility="collapsed", placeholder="namn@foretag.se")
-        with col2:
-            if st.button("Skicka ➔", use_container_width=True):
-                if email:
-                    valid, error_msg = is_valid_email(email)
-                    if valid:
-                        save_lead(clean_domain, email)
-                        if send_email_report(email, clean_domain, final_score, scan_results, ai_text):
-                            st.success("Tack! Rapporten skickas nu till din e-post.")
-                        else:
-                            st.warning("E-postadressen är giltig, men mailet kunde inte skickas just nu. Kontrollera e-postinställningarna i Secrets.")
+    # Lead capture / Övervakning
+    st.write("---")
+    st.subheader("📬 Få rapporten & starta kostnadsfri övervakning")
+    st.write("Fyll i din e-postadress så skickar vi rapporten direkt och registrerar domänen för kontinuerlig övervakning.")
+    
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        email = st.text_input("Din e-postadress:", label_visibility="collapsed", placeholder="namn@foretag.se")
+    with col2:
+        if st.button("Skicka ➔", use_container_width=True):
+            if email:
+                valid, error_msg = is_valid_email(email)
+                if valid:
+                    # Spara i CSV (legacy)
+                    save_lead(clean_domain, email)
+                    
+                    # Spara i Supabase-databasen
+                    save_subscription_to_supabase(email, clean_domain, final_score)
+                    
+                    if send_email_report(email, clean_domain, final_score, scan_results, ai_text):
+                        st.success("Tack! Rapporten har skickats till din e-post och domänen är nu uppkopplad för övervakning.")
                     else:
-                        st.error(f"⚠️ {error_msg}")
+                        st.warning("Domänen registrerades, men mailet kunde inte skickas just nu. Kontrollera e-postinställningarna i Secrets.")
                 else:
-                    st.warning("Ange e-post.")
+                    st.error(f"⚠️ {error_msg}")
+            else:
+                st.warning("Ange e-post.")
 
-# --- INFORMATION OCH FÖRTROENDE (VISAS NÄR MAN INTE SKANNAT) ---
+# INFORMATION OCH FÖRTROENDE (VISAS NÄR MAN INTE SKANNAT)
 if 'scan_results' not in st.session_state:
     st.write("---")
     st.markdown("### ⚡ Hur det fungerar")
