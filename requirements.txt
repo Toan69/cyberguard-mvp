@@ -1,4 +1,3 @@
-Plaintext
 streamlit
 dnspython
 groq
