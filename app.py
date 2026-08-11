@@ -23,7 +23,7 @@ load_dotenv()
 
 # --- SIDKONFIGURATION ---
 st.set_page_config(
-    page_title="CyberGuard AI | Säkerhetsanalys för Småföretag",
+    page_title="CyberGuard AI",
     page_icon="🛡️",
     layout="centered",
     initial_sidebar_state="collapsed"
@@ -35,13 +35,33 @@ def send_email_report(to_email, domain_name, ai_summary):
         sender_email = st.secrets["EMAIL_SENDER"]
         sender_password = st.secrets["EMAIL_PASSWORD"]
 
-        msg = MIMEMultipart()
-        msg['From'] = sender_email
+        msg = MIMEMultipart('alternative')
+        msg['From'] = f"CyberGuard AI <{sender_email}>"
         msg['To'] = to_email
         msg['Subject'] = f"Säkerhetsrapport för {domain_name} — CyberGuard AI"
 
-        body = f"Hej!\n\nTack för att du kört en säkerhetsanalys på CyberGuard AI.\n\nHär är AI-analysen för {domain_name}:\n\n{ai_summary}\n\nMed vänliga hälsningar,\nCyberGuard AI"
-        msg.attach(MIMEText(body, 'plain'))
+        # Formatera texten snyggt i HTML
+        html_content = f"""
+        <html>
+          <body style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+              <h2 style="color: #0f172a;">🛡️ CyberGuard AI — Säkerhetsrapport</h2>
+              <p>Hej!</p>
+              <p>Tack för att du körde en säkerhetsanalys för <strong>{domain_name}</strong>.</p>
+              <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+              <h3 style="color: #1e293b;">AI-Analys & Resultat:</h3>
+              <p style="background-color: #f8fafc; padding: 15px; border-left: 4px solid #0284c7; border-radius: 4px;">
+                {ai_summary}
+              </p>
+              <p>Vill du ha hjälp med att konfigurera dina DNS-inställningar eller täppa till säkerhetsluckorna? Svara direkt på detta mail så hjälper vi dig!</p>
+              <br>
+              <p style="font-size: 0.9em; color: #64748b;">Med vänliga hälsningar,<br><strong>CyberGuard AI Teamet</strong></p>
+            </div>
+          </body>
+        </html>
+        """
+
+        msg.attach(MIMEText(html_content, 'html'))
 
         server = smtplib.SMTP('smtp.gmail.com', 587)
         server.starttls()
