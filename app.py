@@ -14,6 +14,9 @@ from reportlab.lib import colors
 import io
 from groq import Groq
 from dotenv import load_dotenv
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # Ladda API-nyckel från .env
 load_dotenv()
@@ -25,6 +28,30 @@ st.set_page_config(
     layout="centered",
     initial_sidebar_state="collapsed"
 )
+
+# --- E-POSTFUNKTION ---
+def send_email_report(to_email, domain_name, ai_summary):
+    try:
+        sender_email = st.secrets["EMAIL_SENDER"]
+        sender_password = st.secrets["EMAIL_PASSWORD"]
+
+        msg = MIMEMultipart()
+        msg['From'] = sender_email
+        msg['To'] = to_email
+        msg['Subject'] = f"Säkerhetsrapport för {domain_name} — CyberGuard AI"
+
+        body = f"Hej!\n\nTack för att du kärt en säkerhetsanalys på CyberGuard AI.\n\nHär är AI-analysen för {domain_name}:\n\n{ai_summary}\n\nMed vänliga hälsningar,\nCyberGuard AI"
+        msg.attach(MIMEText(body, 'plain'))
+
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(sender_email, sender_password)
+        server.send_message(msg)
+        server.quit()
+        return True
+    except Exception as e:
+        st.error(f"E-postfel: {e}")
+        return False
 
 # --- PDF-GENERERING ---
 def create_pdf(domain_name, score, scan_results, missing_items, ai_text):
@@ -94,7 +121,7 @@ if admin_password == "admin123":
     st.sidebar.success("Inloggad som Admin")
     st.title("⚙️ Admin Dashboard")
     
-    api_key_status = "✅ Laddad från .env" if os.getenv("GROQ_API_KEY") else "❌ Saknas i .env"
+    api_key_status = "✅ Laddad" if os.getenv("GROQ_API_KEY") or "GROQ_API_KEY" in st.secrets else "❌ Saknas"
     st.write(f"**Groq API-nyckel:** {api_key_status}")
 
     st.divider()
@@ -184,7 +211,7 @@ def check_dns_security(domain_name):
     return results, max(score, 0), missing_items
 
 def generate_ai_analysis(domain_name, score, missing):
-    api_key = os.getenv("GROQ_API_KEY")
+    api_key = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
     if api_key:
         try:
             client = Groq(api_key=api_key)
@@ -282,7 +309,10 @@ if 'scan_results' in st.session_state:
             if st.button("Skicka ➔", use_container_width=True):
                 if email and "@" in email:
                     save_lead(clean_domain, email)
-                    st.success("Tack! Vi återkommer inom kort.")
+                    if send_email_report(email, clean_domain, ai_text):
+                        st.success("Tack! Rapporten har skickats till din e-post.")
+                    else:
+                        st.warning("E-postadressen sparades, men mailet kunde inte skickas. Kontrollera e-postinställningarna i Secrets.")
                 else:
                     st.warning("Ange e-post.")
 
