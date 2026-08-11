@@ -1,0 +1,32 @@
+name: CyberGuard Weekly Scan
+
+on:
+  schedule:
+    # Körs varje måndag kl 08:00 UTC
+    - cron: '0 8 * * 1'
+  workflow_dispatch: # Gör att du även kan starta skanningen manuellt med en knapp!
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hämta kod
+        uses: actions/checkout@v3
+
+      - name: Sätt upp Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Installera beroenden
+        run: |
+          python -m pip install --upgrade pip
+          pip install dnspython supabase
+
+      - name: Kör övervakningsskript
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+        run: python monitor.py
