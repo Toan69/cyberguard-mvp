@@ -34,7 +34,13 @@ st.set_page_config(
 st.markdown("""
 <style>
     .stApp {
-        background: linear-gradient(180deg, #0a0e1a 0%, #0d1220 100%);
+        background-color: #0a0e1a;
+        background-image:
+            radial-gradient(circle at 12% 8%, rgba(79,157,255,0.16) 0%, transparent 45%),
+            radial-gradient(circle at 88% 92%, rgba(126,224,208,0.13) 0%, transparent 45%),
+            linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
+        background-size: auto, auto, 42px 42px, 42px 42px;
     }
     html, body, [class*="css"] {
         font-family: 'Inter', -apple-system, 'Segoe UI', sans-serif;
