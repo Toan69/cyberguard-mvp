@@ -192,19 +192,109 @@ def render_score_gauge(score):
     </div>
     """, unsafe_allow_html=True)
 
+# --- E-POSTMALL (HTML) ---
+def build_html_email(domain_name, score, scan_results, ai_summary):
+    if score >= 80:
+        score_color = "#22c55e"
+    elif score >= 50:
+        score_color = "#eab308"
+    else:
+        score_color = "#ef4444"
+
+    rows_html = ""
+    for test, status in scan_results.items():
+        if status.startswith("✅"):
+            badge_color = "#22c55e"
+            badge_bg = "#dcfce7"
+        elif status.startswith("⚠️"):
+            badge_color = "#b45309"
+            badge_bg = "#fef3c7"
+        else:
+            badge_color = "#dc2626"
+            badge_bg = "#fee2e2"
+        detail = status.split(" ", 1)[1] if " " in status else status
+        rows_html += f"""
+        <tr>
+            <td style="padding:10px 14px; border-bottom:1px solid #e2e8f0; font-size:14px; color:#0f172a; font-weight:600;">{test}</td>
+            <td style="padding:10px 14px; border-bottom:1px solid #e2e8f0; font-size:13px;">
+                <span style="background:{badge_bg}; color:{badge_color}; padding:4px 10px; border-radius:999px; font-weight:600;">{detail}</span>
+            </td>
+        </tr>
+        """
+
+    ai_summary_html = ai_summary.replace("\n", "<br>")
+
+    html = f"""
+    <html>
+    <body style="margin:0; padding:0; background-color:#0d1220; font-family:'Segoe UI', Arial, sans-serif;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#0d1220; padding:30px 0;">
+            <tr>
+                <td align="center">
+                    <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border-radius:16px; overflow:hidden;">
+                        <tr>
+                            <td style="background:linear-gradient(90deg, #1e3a8a, #0f172a); padding:32px 30px; text-align:center;">
+                                <div style="font-size:28px; margin-bottom:6px;">🛡️</div>
+                                <div style="font-size:22px; font-weight:800; color:#ffffff;">CyberGuard AI</div>
+                                <div style="font-size:13px; color:#93c5fd; margin-top:4px;">Säkerhetsrapport för {domain_name}</div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding:30px;">
+                                <p style="font-size:15px; color:#334155; margin:0 0 20px 0;">Hej!<br>Tack för att du körde en säkerhetsanalys på CyberGuard AI. Här är resultatet för <strong>{domain_name}</strong>.</p>
+
+                                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc; border-radius:12px; padding:20px; margin-bottom:24px;">
+                                    <tr>
+                                        <td style="text-align:center;">
+                                            <div style="font-size:42px; font-weight:800; color:{score_color};">{score}<span style="font-size:16px; color:#94a3b8;">/100</span></div>
+                                            <div style="font-size:13px; color:#64748b; margin-top:4px;">Säkerhetspoäng</div>
+                                        </td>
+                                    </tr>
+                                </table>
+
+                                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0; border-radius:10px; overflow:hidden; margin-bottom:24px;">
+                                    {rows_html}
+                                </table>
+
+                                <div style="background:#eff6ff; border-left:4px solid #3b82f6; border-radius:8px; padding:18px 20px; margin-bottom:26px;">
+                                    <div style="font-size:14px; font-weight:700; color:#1e3a8a; margin-bottom:8px;">🧠 AI-Analys & Rådgivning</div>
+                                    <div style="font-size:14px; color:#334155; line-height:1.6;">{ai_summary_html}</div>
+                                </div>
+
+                                <p style="font-size:13px; color:#94a3b8; text-align:center; margin:0;">Med vänliga hälsningar,<br><strong style="color:#334155;">CyberGuard AI</strong></p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="background:#f1f5f9; padding:16px 30px; text-align:center;">
+                                <div style="font-size:11px; color:#94a3b8;">Detta mail skickades eftersom du begärde en säkerhetsanalys via CyberGuard AI.</div>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>
+    """
+    return html
+
 # --- E-POSTFUNKTION ---
-def send_email_report(to_email, domain_name, ai_summary):
+def send_email_report(to_email, domain_name, score, scan_results, ai_summary):
     try:
         sender_email = st.secrets["EMAIL_SENDER"]
         sender_password = st.secrets["EMAIL_PASSWORD"]
 
-        msg = MIMEMultipart()
+        msg = MIMEMultipart("alternative")
         msg['From'] = sender_email
         msg['To'] = to_email
         msg['Subject'] = f"Säkerhetsrapport för {domain_name} — CyberGuard AI"
 
-        body = f"Hej!\n\nTack för att du kört en säkerhetsanalys på CyberGuard AI.\n\nHär är AI-analysen för {domain_name}:\n\n{ai_summary}\n\nMed vänliga hälsningar,\nCyberGuard AI"
-        msg.attach(MIMEText(body, 'plain'))
+        # Textversion (fallback för klienter som inte visar HTML)
+        plain_body = f"Hej!\n\nTack för att du körde en säkerhetsanalys på CyberGuard AI.\n\nSäkerhetspoäng för {domain_name}: {score}/100\n\nAI-analys:\n{ai_summary}\n\nMed vänliga hälsningar,\nCyberGuard AI"
+        msg.attach(MIMEText(plain_body, 'plain'))
+
+        # HTML-version
+        html_body = build_html_email(domain_name, score, scan_results, ai_summary)
+        msg.attach(MIMEText(html_body, 'html'))
 
         server = smtplib.SMTP('smtp.gmail.com', 587)
         server.starttls()
@@ -482,7 +572,7 @@ if 'scan_results' in st.session_state:
             if st.button("Skicka ➔", use_container_width=True):
                 if email and "@" in email:
                     save_lead(clean_domain, email)
-                    if send_email_report(email, clean_domain, ai_text):
+                    if send_email_report(email, clean_domain, final_score, scan_results, ai_text):
                         st.success("Tack! Rapporten har skickats till din e-post.")
                     else:
                         st.warning("E-postadressen sparades, men mailet kunde inte skickas. Kontrollera e-postinställningarna i Secrets.")
