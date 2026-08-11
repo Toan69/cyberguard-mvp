@@ -5,6 +5,7 @@ import ssl
 import time
 import csv
 import os
+import re
 import pandas as pd
 from urllib.parse import urlparse
 from reportlab.lib.pagesizes import letter
@@ -191,6 +192,24 @@ def render_score_gauge(score):
         </div>
     </div>
     """, unsafe_allow_html=True)
+
+# --- E-POSTVALIDERING ---
+def is_valid_email(email_addr):
+    """
+    Kontrollerar både format (regex) och att domänen faktiskt
+    har en mailserver (MX-post). Fångar t.ex. 'asdf@asdf' eller
+    'namn@paahittad-domän.se'.
+    """
+    pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+    if not re.match(pattern, email_addr.strip()):
+        return False, "E-postadressen har fel format. Ange t.ex. namn@företag.se"
+
+    domain_part = email_addr.strip().split("@")[1]
+    try:
+        dns.resolver.resolve(domain_part, 'MX')
+        return True, ""
+    except Exception:
+        return False, f"Domänen '{domain_part}' kan inte ta emot e-post. Kontrollera att adressen är korrekt stavad."
 
 # --- E-POSTMALL (HTML) ---
 def build_html_email(domain_name, score, scan_results, ai_summary):
@@ -570,12 +589,16 @@ if 'scan_results' in st.session_state:
             email = st.text_input("Din e-postadress:", label_visibility="collapsed", placeholder="namn@foretag.se")
         with col2:
             if st.button("Skicka ➔", use_container_width=True):
-                if email and "@" in email:
-                    save_lead(clean_domain, email)
-                    if send_email_report(email, clean_domain, final_score, scan_results, ai_text):
-                        st.success("Tack! Rapporten har skickats till din e-post.")
+                if email:
+                    valid, error_msg = is_valid_email(email)
+                    if valid:
+                        save_lead(clean_domain, email)
+                        if send_email_report(email, clean_domain, final_score, scan_results, ai_text):
+                            st.success("Tack! Rapporten skickas nu till din e-post.")
+                        else:
+                            st.warning("E-postadressen är giltig, men mailet kunde inte skickas just nu. Kontrollera e-postinställningarna i Secrets.")
                     else:
-                        st.warning("E-postadressen sparades, men mailet kunde inte skickas. Kontrollera e-postinställningarna i Secrets.")
+                        st.error(f"⚠️ {error_msg}")
                 else:
                     st.warning("Ange e-post.")
 
