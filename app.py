@@ -40,7 +40,7 @@ def send_email_report(to_email, domain_name, ai_summary):
         msg['To'] = to_email
         msg['Subject'] = f"Säkerhetsrapport för {domain_name} — CyberGuard AI"
 
-        body = f"Hej!\n\nTack för att du kärt en säkerhetsanalys på CyberGuard AI.\n\nHär är AI-analysen för {domain_name}:\n\n{ai_summary}\n\nMed vänliga hälsningar,\nCyberGuard AI"
+        body = f"Hej!\n\nTack för att du kört en säkerhetsanalys på CyberGuard AI.\n\nHär är AI-analysen för {domain_name}:\n\n{ai_summary}\n\nMed vänliga hälsningar,\nCyberGuard AI"
         msg.attach(MIMEText(body, 'plain'))
 
         server = smtplib.SMTP('smtp.gmail.com', 587)
