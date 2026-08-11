@@ -23,11 +23,174 @@ load_dotenv()
 
 # --- SIDKONFIGURATION ---
 st.set_page_config(
-    page_title="CyberGuard AI",
+    page_title="CyberGuard AI | Säkerhetsanalys för Småföretag",
     page_icon="🛡️",
     layout="centered",
     initial_sidebar_state="collapsed"
 )
+
+# --- DESIGN / CSS ---
+st.markdown("""
+<style>
+    .stApp {
+        background: linear-gradient(180deg, #0a0e1a 0%, #0d1220 100%);
+    }
+    html, body, [class*="css"] {
+        font-family: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+    }
+    .cg-hero {
+        text-align: center;
+        padding: 2.5rem 1rem 1.5rem 1rem;
+    }
+    .cg-hero h1 {
+        font-size: 2.6rem;
+        font-weight: 800;
+        background: linear-gradient(90deg, #4f9dff, #7ee0d0);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 0.3rem;
+    }
+    .cg-hero p {
+        color: #8a93a6;
+        font-size: 1.05rem;
+    }
+    .cg-card {
+        background: rgba(255,255,255,0.03);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 16px;
+        padding: 1.4rem 1.6rem;
+        margin-bottom: 1.2rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+    }
+    .cg-status {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.9rem 1.1rem;
+        border-radius: 12px;
+        width: 100%;
+        margin-bottom: 0.7rem;
+        font-weight: 600;
+        font-size: 0.98rem;
+    }
+    .cg-status-ok {
+        background: rgba(34,197,94,0.12);
+        border: 1px solid rgba(34,197,94,0.35);
+        color: #4ade80;
+    }
+    .cg-status-warn {
+        background: rgba(234,179,8,0.12);
+        border: 1px solid rgba(234,179,8,0.35);
+        color: #facc15;
+    }
+    .cg-status-bad {
+        background: rgba(239,68,68,0.12);
+        border: 1px solid rgba(239,68,68,0.35);
+        color: #f87171;
+    }
+    .cg-status small {
+        display: block;
+        font-weight: 400;
+        opacity: 0.75;
+        font-size: 0.82rem;
+        margin-top: 0.15rem;
+    }
+    .cg-score-wrap {
+        display: flex;
+        align-items: center;
+        gap: 1.6rem;
+        padding: 0.4rem 0;
+    }
+    .cg-score-num {
+        font-size: 3.2rem;
+        font-weight: 800;
+        line-height: 1;
+        white-space: nowrap;
+    }
+    .cg-score-bar-bg {
+        flex: 1;
+        height: 14px;
+        background: rgba(255,255,255,0.08);
+        border-radius: 999px;
+        overflow: hidden;
+    }
+    .cg-score-bar-fill {
+        height: 100%;
+        border-radius: 999px;
+        transition: width 0.6s ease;
+    }
+    .stButton > button, .stFormSubmitButton > button {
+        background: linear-gradient(90deg, #ff4b5c, #ff7a4f) !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 10px !important;
+        padding: 0.7rem 1.4rem !important;
+        font-weight: 700 !important;
+        box-shadow: 0 4px 14px rgba(255,75,92,0.35) !important;
+        transition: transform 0.15s ease, box-shadow 0.15s ease !important;
+    }
+    .stButton > button:hover, .stFormSubmitButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(255,75,92,0.5) !important;
+    }
+    .stTextInput > div > div > input {
+        background: rgba(255,255,255,0.04) !important;
+        border: 1px solid rgba(255,255,255,0.12) !important;
+        border-radius: 10px !important;
+        color: white !important;
+    }
+    .cg-trust {
+        text-align: center;
+        color: #6b7280;
+        font-size: 0.85rem;
+        padding: 0.5rem 0 1.5rem 0;
+        border-bottom: 1px solid rgba(255,255,255,0.06);
+        margin-bottom: 1.5rem;
+    }
+    .cg-step-num {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: rgba(79,157,255,0.15);
+        color: #4f9dff;
+        font-weight: 700;
+        margin-bottom: 0.4rem;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# --- DESIGN-HJÄLPFUNKTIONER ---
+def render_status_row(label, level, detail_text):
+    """level: 'ok', 'warn' eller 'bad'"""
+    icons = {"ok": "✅", "warn": "⚠️", "bad": "❌"}
+    st.markdown(f"""
+    <div class="cg-status cg-status-{level}">
+        <div style="font-size:1.2rem;">{icons[level]}</div>
+        <div><strong>{label}</strong><small>{detail_text}</small></div>
+    </div>
+    """, unsafe_allow_html=True)
+
+def render_score_gauge(score):
+    if score >= 80:
+        color = "#4ade80"
+    elif score >= 50:
+        color = "#facc15"
+    else:
+        color = "#f87171"
+
+    st.markdown(f"""
+    <div class="cg-card">
+        <div class="cg-score-wrap">
+            <div class="cg-score-num" style="color:{color}">{score}<span style="font-size:1.2rem; opacity:0.6;">/100</span></div>
+            <div class="cg-score-bar-bg">
+                <div class="cg-score-bar-fill" style="width:{score}%; background:{color};"></div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 # --- E-POSTFUNKTION ---
 def send_email_report(to_email, domain_name, ai_summary):
@@ -35,33 +198,13 @@ def send_email_report(to_email, domain_name, ai_summary):
         sender_email = st.secrets["EMAIL_SENDER"]
         sender_password = st.secrets["EMAIL_PASSWORD"]
 
-        msg = MIMEMultipart('alternative')
-        msg['From'] = f"CyberGuard AI <{sender_email}>"
+        msg = MIMEMultipart()
+        msg['From'] = sender_email
         msg['To'] = to_email
         msg['Subject'] = f"Säkerhetsrapport för {domain_name} — CyberGuard AI"
 
-        # Formatera texten snyggt i HTML
-        html_content = f"""
-        <html>
-          <body style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
-            <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
-              <h2 style="color: #0f172a;">🛡️ CyberGuard AI — Säkerhetsrapport</h2>
-              <p>Hej!</p>
-              <p>Tack för att du körde en säkerhetsanalys för <strong>{domain_name}</strong>.</p>
-              <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
-              <h3 style="color: #1e293b;">AI-Analys & Resultat:</h3>
-              <p style="background-color: #f8fafc; padding: 15px; border-left: 4px solid #0284c7; border-radius: 4px;">
-                {ai_summary}
-              </p>
-              <p>Vill du ha hjälp med att konfigurera dina DNS-inställningar eller täppa till säkerhetsluckorna? Svara direkt på detta mail så hjälper vi dig!</p>
-              <br>
-              <p style="font-size: 0.9em; color: #64748b;">Med vänliga hälsningar,<br><strong>CyberGuard AI Teamet</strong></p>
-            </div>
-          </body>
-        </html>
-        """
-
-        msg.attach(MIMEText(html_content, 'html'))
+        body = f"Hej!\n\nTack för att du kört en säkerhetsanalys på CyberGuard AI.\n\nHär är AI-analysen för {domain_name}:\n\n{ai_summary}\n\nMed vänliga hälsningar,\nCyberGuard AI"
+        msg.attach(MIMEText(body, 'plain'))
 
         server = smtplib.SMTP('smtp.gmail.com', 587)
         server.starttls()
@@ -87,7 +230,6 @@ def create_pdf(domain_name, score, scan_results, missing_items, ai_text):
     story = []
     styles = getSampleStyleSheet()
 
-    # Titel och Header
     title_style = ParagraphStyle(
         'TitleStyle',
         parent=styles['Heading1'],
@@ -105,7 +247,6 @@ def create_pdf(domain_name, score, scan_results, missing_items, ai_text):
     story.append(Paragraph(f"<b>Datum:</b> {time.strftime('%Y-%m-%d')}", normal_style))
     story.append(Spacer(1, 15))
 
-    # Resultat-tabell
     data = [["Säkerhetskontroll", "Status"]]
     for k, v in scan_results.items():
         data.append([k, v])
@@ -123,7 +264,6 @@ def create_pdf(domain_name, score, scan_results, missing_items, ai_text):
     story.append(t)
     story.append(Spacer(1, 20))
 
-    # AI Analys
     story.append(Paragraph("<b>AI-Analys & Åtgärdsförslag:</b>", styles['Heading2']))
     story.append(Spacer(1, 8))
     clean_ai_text = ai_text.replace('*', '').replace('#', '')
@@ -137,7 +277,11 @@ def create_pdf(domain_name, score, scan_results, missing_items, ai_text):
 st.sidebar.title("🔐 Adminpanel")
 admin_password = st.sidebar.text_input("Lösenord:", type="password")
 
-if admin_password == "admin123":
+# OBS: Lägg till ADMIN_PASSWORD i Streamlit Cloud → Settings → Secrets.
+# Tills du gjort det används "admin123" som reserv (byt ASAP, se not nedan).
+correct_admin_password = st.secrets.get("ADMIN_PASSWORD", "admin123")
+
+if admin_password and admin_password == correct_admin_password:
     st.sidebar.success("Inloggad som Admin")
     st.title("⚙️ Admin Dashboard")
     
@@ -164,9 +308,15 @@ if admin_password == "admin123":
     st.stop()
 
 # --- HUVUDAPP (HERO SEKTION) ---
-st.markdown("<h1 style='text-align: center;'>🛡️ CyberGuard AI</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; font-size: 1.2rem; color: #64748B;'>Autonom Säkerhetsanalys för Småföretag</p>", unsafe_allow_html=True)
-st.write("---")
+st.markdown("""
+<div class="cg-hero">
+    <h1>🛡️ CyberGuard AI</h1>
+    <p>Autonom säkerhetsanalys för småföretag</p>
+</div>
+<div class="cg-trust">
+    🔒 Ingen data delas med tredje part &nbsp;•&nbsp; Analys på under 10 sekunder &nbsp;•&nbsp; 100% gratis
+</div>
+""", unsafe_allow_html=True)
 
 st.markdown("##### 🔍 Testa ditt företags digitala skydd")
 st.caption("Ange din domän nedan för att identifiera brister i e-postskydd och SSL-kryptering på under 10 sekunder.")
@@ -288,23 +438,26 @@ if 'scan_results' in st.session_state:
 
     st.write("---")
     st.markdown(f"### 📊 Analysresultat för `{clean_domain}`")
-    
-    # Poäng-banner
-    if final_score >= 80:
-        st.success(f"**Säkerhetspoäng: {final_score} / 100** — Bra grundskydd!")
-    elif final_score >= 50:
-        st.warning(f"**Säkerhetspoäng: {final_score} / 100** — Åtgärder rekommenderas.")
-    else:
-        st.error(f"**Säkerhetspoäng: {final_score} / 100** — Kritiska säkerhetsbrister upptäckta!")
 
-    # Detaljerad lista
+    # Poäng-gauge (visuell mätare istället för text-banner)
+    render_score_gauge(final_score)
+
+    # Detaljerad status per kontroll (status-badges istället för punktlista)
     st.markdown("#### Detektionsöversikt")
+
     for test, status in scan_results.items():
-        st.write(f"• **{test}:** {status}")
+        if status.startswith("✅"):
+            level = "ok"
+        elif status.startswith("⚠️"):
+            level = "warn"
+        else:
+            level = "bad"
+        detail = status.split(" ", 1)[1] if " " in status else status
+        render_status_row(test, level, detail)
 
     st.write("")
     st.markdown("#### 🧠 AI-Analys & Rådgivning")
-    st.info(ai_text)
+    st.markdown(f'<div class="cg-card">{ai_text}</div>', unsafe_allow_html=True)
 
     # Ladda ner PDF
     pdf_buffer = create_pdf(clean_domain, final_score, scan_results, missing_items, ai_text)
@@ -343,13 +496,16 @@ if 'scan_results' not in st.session_state:
     
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.markdown("**1. Automatisk skanning**")
+        st.markdown('<div class="cg-step-num">1</div>', unsafe_allow_html=True)
+        st.markdown("**Automatisk skanning**")
         st.caption("Vi kontrollerar din domäns offentliga DNS-poster för SPF, DMARC samt HTTPS-kryptering.")
     with col2:
-        st.markdown("**2. AI-Analys**")
+        st.markdown('<div class="cg-step-num">2</div>', unsafe_allow_html=True)
+        st.markdown("**AI-Analys**")
         st.caption("Vår AI utvärderar resultaten och förklarar konsekvenserna i klartext anpassat för företagare.")
     with col3:
-        st.markdown("**3. Åtgärdsrapport**")
+        st.markdown('<div class="cg-step-num">3</div>', unsafe_allow_html=True)
+        st.markdown("**Åtgärdsrapport**")
         st.caption("Du får en skräddarsydd PDF-rapport med konkreta instruktioner för att täppa till luckorna.")
 
     st.write("---")
